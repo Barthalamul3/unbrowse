@@ -17,6 +17,10 @@ const CHECK_INTERVAL = 4 * 60 * 60 * 1000; // 4 hours
 
 /** Non-blocking auto-update check. Call at CLI startup — returns immediately. */
 export function maybeAutoUpdate(): void {
+  // Security-first default: disable silent background updates unless explicitly enabled.
+  // Set UNBROWSE_ENABLE_AUTO_UPDATE=1 to opt in.
+  if (process.env.UNBROWSE_ENABLE_AUTO_UPDATE !== "1") return;
+
   try {
     // Skip dev installs (symlinks to monorepo)
     if (lstatSync(SKILL_DIR).isSymbolicLink()) return;

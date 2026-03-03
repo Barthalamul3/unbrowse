@@ -16,7 +16,7 @@ Skills discovered by any agent are published to a shared marketplace and instant
 
 **JS bundle scanning.** During capture, Unbrowse scans JavaScript bundles for API routes that were never triggered by network traffic. Endpoints like `/api/search` that only fire on user interaction are now discovered automatically — zero extra requests, since the bundles are already downloaded.
 
-**Auto-update.** The skill silently updates itself in the background every 4 hours. No more manual `npx skills update`.
+**Auto-update (opt-in).** Background updates are disabled by default for supply-chain safety. Enable explicitly with `UNBROWSE_ENABLE_AUTO_UPDATE=1`.
 
 **10x faster execution.** Server-side fetch with stored auth headers means most calls skip the browser entirely — 120s → 100ms. Local disk cache eliminates marketplace latency for known domains.
 
@@ -164,6 +164,7 @@ See [SKILL.md](./SKILL.md) for the full API reference including all endpoints, s
 | `HOST` | `127.0.0.1` | Server bind address |
 | `UNBROWSE_URL` | `http://localhost:6969` | Base URL for API calls |
 | `UNBROWSE_API_KEY` | auto-generated | API key override |
+| `UNBROWSE_ENABLE_AUTO_UPDATE` | `0` | Opt in to background auto-updates (`1` to enable) |
 | `UNBROWSE_TOS_ACCEPTED` | — | Accept ToS non-interactively |
 | `UNBROWSE_NON_INTERACTIVE` | — | Skip readline prompts |
 

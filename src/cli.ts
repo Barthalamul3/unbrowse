@@ -573,6 +573,7 @@ function printHelp(): void {
 // ---------------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  // Auto-update is opt-in. Set UNBROWSE_ENABLE_AUTO_UPDATE=1 to enable.
   maybeAutoUpdate();
 
   const { command, args, flags } = parseArgs(process.argv);
