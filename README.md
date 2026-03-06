@@ -30,6 +30,18 @@ No manual configuration needed — credentials are auto-generated on first run.
 
 Works with Claude Code, Cursor, Codex, Windsurf, and any agent that supports skills.
 
+### Codex MCP setup
+
+Run the local MCP wrapper in yolo mode so Codex can call Unbrowse directly:
+
+```bash
+codex mcp add unbrowse --env SKILL_DIR=/opt/ai/unbrowse --env UNBROWSE_MCP_YOLO=1 --env UNBROWSE_YOLO_CHROME_PROFILE=Default --env UNBROWSE_NON_INTERACTIVE=1 --env UNBROWSE_TOS_ACCEPTED=1 -- bun /opt/ai/unbrowse/src/mcp/server.ts
+```
+
+This wrapper speaks MCP over stdio, auto-starts the local Unbrowse server, and preflights browser cookie extraction from your real Chrome `Default` profile before `resolve_intent` calls. Use `interactive_login` only when cookie stealing is not enough.
+
+The MCP server also exposes `perplexity_navigate_search`, which calls Perplexity’s live navigate endpoint directly and returns both the raw API payload and convenience fields like `top_hit` and `hit_count`.
+
 ## The problem
 
 Every AI company building agents hits the same wall: **browsers don't work for machines.**

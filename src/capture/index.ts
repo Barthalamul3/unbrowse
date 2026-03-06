@@ -61,6 +61,14 @@ export interface CaptureResult {
   js_bundles?: Map<string, string>;
 }
 
+export interface TrackedRequestLike {
+  url: string;
+  method: string;
+  headers: Record<string, string>;
+  timestamp: number;
+  resourceType?: string;
+}
+
 export interface RawRequest {
   url: string;
   method: string;
@@ -191,6 +199,41 @@ async function waitForContentReady(
   }
 }
 
+export function buildRawRequests(
+  trackedRequests: TrackedRequestLike[],
+  responseBodies: Map<string, string>,
+  requestBodies: Map<string, string>,
+  cdpRequestBodies: Map<string, string> = new Map(),
+): RawRequest[] {
+  const requests: RawRequest[] = trackedRequests.map((r) => ({
+    url: r.url,
+    method: r.method,
+    request_headers: r.headers,
+    request_body: requestBodies.get(r.url) ?? cdpRequestBodies.get(r.url),
+    response_status: 0,
+    response_headers: {},
+    response_body: responseBodies.get(r.url),
+    timestamp: new Date(r.timestamp).toISOString(),
+  }));
+
+  const trackedUrls = new Set(trackedRequests.map((r) => r.url));
+  for (const [bodyUrl, body] of responseBodies) {
+    if (!trackedUrls.has(bodyUrl)) {
+      requests.push({
+        url: bodyUrl,
+        method: "GET",
+        request_headers: {},
+        response_status: 200,
+        response_headers: {},
+        response_body: body,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  return requests;
+}
+
 export async function captureSession(
   url: string,
   authHeaders?: Record<string, string>,
@@ -242,6 +285,7 @@ export async function captureSession(
   // Hook page.on('response') BEFORE navigation to capture all response bodies
   // including XHR/fetch calls made during initial page load
   const responseBodies = new Map<string, string>();
+  const requestBodies = new Map<string, string>();
   const MAX_BODY_SIZE = 512 * 1024; // 512KB
 
   // Collect same-domain JS bundles for API route scanning
@@ -253,6 +297,14 @@ export async function captureSession(
 
   try {
     const page = browser.getPage();
+    page.on("request", (request) => {
+      try {
+        const method = request.method().toUpperCase();
+        if (method === "GET" || method === "HEAD") return;
+        const body = request.postData();
+        if (body) requestBodies.set(request.url(), body);
+      } catch { /* request body unavailable */ }
+    });
     page.on("response", async (response) => {
       try {
         const ct = response.headers()["content-type"] ?? "";
@@ -298,10 +350,19 @@ export async function captureSession(
   // CDP-based WebSocket capture
   const wsMessages: CapturedWsMessage[] = [];
   const wsUrlMap = new Map<string, string>(); // requestId -> url
+  const cdpRequestBodies = new Map<string, string>();
   try {
     const page = browser.getPage();
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Network.enable");
+
+    cdp.on("Network.requestWillBeSent", (params: { request?: { url?: string; method?: string; postData?: string } }) => {
+      try {
+        const req = params.request;
+        if (!req?.url || !req.method || req.method === "GET" || req.method === "HEAD") return;
+        if (req.postData) cdpRequestBodies.set(req.url, req.postData);
+      } catch { /* ignore CDP request capture issues */ }
+    });
 
     cdp.on("Network.webSocketCreated", (params: { requestId: string; url: string }) => {
       wsUrlMap.set(params.requestId, params.url);
@@ -372,32 +433,7 @@ export async function captureSession(
     html = await page.content();
   } catch {}
 
-  const requests: RawRequest[] = trackedRequests.map((r) => ({
-    url: r.url,
-    method: r.method,
-    request_headers: r.headers,
-    response_status: 0,
-    response_headers: {},
-    response_body: responseBodies.get(r.url),
-    timestamp: new Date(r.timestamp).toISOString(),
-  }));
-
-  // Synthesize RawRequests for response bodies captured by the response listener
-  // but missed by request tracking (e.g., SPA API calls during intent-aware wait).
-  const trackedUrls = new Set(trackedRequests.map((r) => r.url));
-  for (const [bodyUrl, body] of responseBodies) {
-    if (!trackedUrls.has(bodyUrl)) {
-      requests.push({
-        url: bodyUrl,
-        method: "GET",
-        request_headers: {},
-        response_status: 200,
-        response_headers: {},
-        response_body: body,
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }
+  const requests = buildRawRequests(trackedRequests, responseBodies, requestBodies, cdpRequestBodies);
 
   // Extract session cookies so callers can persist auth for future executions
   const ctx = browser.getContext();
