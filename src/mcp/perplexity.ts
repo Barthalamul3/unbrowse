@@ -79,6 +79,16 @@ export function buildPerplexityNavigateResponse(
 
   if (!hits) return response;
 
+  if (hits.length === 0) {
+    return {
+      ...response,
+      hit_count: 0,
+      provider: parsed?.provider,
+      note: 'Perplexity navigate search is best for navigational queries that resolve to a specific site or page, not broad research prompts.',
+      suggested_next_step: 'Try a web search or split the request into targeted paper/domain queries such as arxiv.org, Anthropic causal tracing paper, or representation engineering GitHub.',
+    };
+  }
+
   return {
     ...response,
     hit_count: hits.length,

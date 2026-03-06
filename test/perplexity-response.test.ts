@@ -67,4 +67,27 @@ describe('Perplexity navigate response', () => {
     expect(response.top_hit).toBeUndefined();
     expect(response.result).toEqual({ error: 'rate_limited' });
   });
+
+  test('explains empty hits for non-navigational queries', () => {
+    const payload = buildPerplexityNavigatePayload('LLM hallucination mitigation papers', { cacheKey: 'abc-123' });
+    const response = buildPerplexityNavigateResponse(
+      'https://suggest.perplexity.ai/search/v3/navigate',
+      payload,
+      {
+        status: 200,
+        ok: true,
+        headers: { 'content-type': 'application/json' },
+        result: {
+          hits: [],
+          provider: 'v2',
+        },
+      },
+    );
+
+    expect(response.hit_count).toBe(0);
+    expect(response.note).toContain('navigational queries');
+    expect(response.note).toContain('broad research');
+    expect(response.suggested_next_step).toContain('web search');
+  });
+
 });
